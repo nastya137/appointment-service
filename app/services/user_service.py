@@ -19,11 +19,9 @@ class UserService:
             last_name: str | None
     ) -> User:
 
-
         user = await self.repository.get_by_telegram_id(
             telegram_id
         )
-
 
         if user:
             return user
@@ -35,6 +33,5 @@ class UserService:
             first_name=first_name,
             last_name=last_name
         )
-
 
         return await self.repository.create(user)
