@@ -13,6 +13,7 @@ from app.repositories.working_schedule_repository import (
 )
 from app.services.appointment_service import AppointmentService
 from app.services.service_service import ServiceService
+from app.services.specialist_service import SpecialistService
 from app.services.user_service import UserService
 
 
@@ -46,4 +47,12 @@ def get_user_service(
 ) -> UserService:
     return UserService(
         repository=UserRepository(session)
+    )
+
+
+def get_specialist_service(
+    session: AsyncSession = Depends(get_session),
+) -> SpecialistService:
+    return SpecialistService(
+        repository=SpecialistRepository(session)
     )
