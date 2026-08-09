@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-
-=======
 # Appointment Booking System
 
 Fullstack система записи на консультацию.
@@ -28,4 +25,3 @@ Fullstack система записи на консультацию.
 - получение свободных временных слотов
 - создание записи
 - Telegram bot integration
->>>>>>> e336764 (feat: add appointment booking MVP)
