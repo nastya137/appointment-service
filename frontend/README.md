@@ -1,77 +1,65 @@
-# React + TypeScript + Vite
+# Тише — интерфейс записи на консультацию
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Учебный Vue 3 + TypeScript + Vite проект. Реальные консультации не проводятся.
 
-Currently, two official plugins are available:
+## Запуск
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Страница: http://127.0.0.1:5173. Для работы формы нужен существующий FastAPI на
+http://127.0.0.1:8000 с заполненными специалистами, услугами, расписанием и тестовым
+пользователем `id = 1`. Бэкенд и Telegram в этом изменении не менялись.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Адрес API можно задать в `.env.local` через `VITE_API_BASE_URL` (пример в
+`.env.example`). Не добавляйте секреты в переменные `VITE_*`: они доступны браузеру.
+При смене адреса фронтенда необходимо отдельно согласовать CORS на сервере.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Поведение формы
 
+- Смена специалиста очищает услугу, дату и время; смена услуги или даты очищает время.
+- Загрузка списков поддерживает отмену устаревших запросов, таймаут и повтор.
+- Поля имеют подписи, валидацию и доступные с клавиатуры элементы выбора времени.
+- Тип контакта (`telegram` или `phone`) соответствует выбранному полю; контакт
+  нормализуется перед отправкой. Для демо предусмотрено заполнение примером.
+- Цена и длительность поступают из API. Отсутствующая цена не считается нулевой.
+- Даты и время показаны в UTC, как расписание текущего API. Прошедшие слоты скрыты
+  и перепроверяются перед отправкой. Серверная проверка времени всё ещё нужна.
+- Во время отправки форма блокируется. После успеха показан результат с номером
+  записи. Запрос создания не повторяется автоматически при сетевой ошибке.
+
+Форма по-прежнему создаёт запись в подключённой базе от тестового пользователя
+`id = 1`: надпись «демо» не заменяет изоляцию данных и авторизацию. В браузере
+контакты и описание не сохраняются; при обновлении страницы форма сбрасывается.
+
+Обработка занятого слота предусмотрена для HTTP 409. Текущий бэкенд может вернуть
+500 для необработанного бизнес-исключения; тогда интерфейс покажет общую ошибку.
+
+## Проверки
+
+```sh
+npm run lint
+npm run build
+npx playwright install chromium
 ```
+
+Оставьте `npm run dev` в отдельном терминале, затем выполните:
+
+```sh
+npm run test:ui
+```
+
+На Windows можно использовать уже установленный Edge без скачивания Chromium:
+
+```powershell
+$env:TEST_BROWSER = 'msedge'
+npm run test:ui
+```
+
+Тесты подменяют запросы API внутри браузера и не создают записи на сервере.
+Они проверяют обязательные поля, сброс зависимостей, запоздалые ответы, контактный
+payload, повторную отправку, ошибки, пустые списки, HTTP 409 и ширины 320–1440 px.
+Скриншоты сохраняются в `test-results/`. Адрес тестируемой страницы переопределяется
+через `TEST_BASE_URL`.

@@ -1,13 +1,15 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routers import specialists
 from app.api.exception_handler import appointment_not_found_handler
 from app.api.routers import services
 from app.api.routers.appointments import router as appointments_router
-from app.database.session import create_database
+from app.database.session import create_database, engine
 from app.exceptions.appointment import AppointmentNotFoundError
 from app.api.routers import users
 
@@ -23,6 +25,16 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+@app.get("/health", tags=["health"])
+async def health():
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+    return {"status": "ok"}
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,5 +53,4 @@ app.include_router(appointments_router)
 app.include_router(services.router)
 app.include_router(users.router)
 app.include_router(specialists.router)
-
 
