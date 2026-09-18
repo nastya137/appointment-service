@@ -1,163 +1,206 @@
-# Appointment Booking System
+# «Тише» — сервис онлайн-записи на консультации
 
-Fullstack система записи на консультацию.
+Fullstack pet-project: клиент выбирает специалиста, услугу и свободное время, оставляет контакт и создаёт запись — через адаптивный веб-интерфейс или Telegram-бота.
 
-## Stack
+Проект показывает полный цикл разработки продукта: от UX и клиентской валидации до бизнес-логики расписания, REST API, хранения данных, интеграции с Telegram, тестов и контейнеризации.
 
-### Backend
-- Python
-- FastAPI
-- SQLAlchemy
-- PostgreSQL/SQLite
-- Telegram Bot
+> MVP без оплаты и проведения реальных консультаций. Интерфейс и демоданные русскоязычные, время хранится и передаётся в UTC.
 
-### Frontend
-- Vue 3
-- TypeScript
-- Vite
-- Tailwind CSS
+![Desktop-интерфейс сервиса «Тише»](docs/interface.png)
 
-## Features
+## Что реализовано
 
-- выбор специалиста
-- выбор услуги специалиста
-- выбор даты
-- получение свободных временных слотов
-- создание записи
-- Telegram bot integration
+### Для пользователя
 
-## Docker: локальная разработка
+- пошаговая запись: специалист → услуга → дата → свободный слот → контакт;
+- фильтрация услуг по выбранному специалисту;
+- расчёт доступного времени с учётом графика, длительности услуги и уже занятых слотов;
+- выбор способа связи: Telegram или телефон;
+- понятные состояния загрузки, пустых данных, ошибок и успешной записи;
+- повторная загрузка данных без потери заполненной формы;
+- адаптивный интерфейс для desktop, tablet и mobile;
+- альтернативный сценарий записи через Telegram-бота.
 
-Нужен запущенный Docker Desktop в режиме Linux containers с Docker Compose.
-Все команды ниже выполняются из папки с `compose.yaml` (внутренняя
-`python-bot-main`, рядом с `app` и `frontend`). Python и Node.js на компьютере
-для этого способа запуска не нужны.
+### С инженерной стороны
 
-### Первый запуск
+- асинхронный REST API на FastAPI и SQLAlchemy 2;
+- разделение backend на API, service и repository-слои;
+- серверная проверка специалиста, услуги, рабочего времени и пересечения записей;
+- реактивный frontend на Vue 3 + TypeScript;
+- защита интерфейса от устаревших ответов API через отмену запросов;
+- OpenAPI-документация, healthcheck API и базы данных;
+- изолированные Docker-сервисы для frontend, backend и Telegram-бота;
+- unit/runtime-тесты backend и браузерные UI-тесты на Playwright.
 
-1. Создайте `.env` из примера, если файла ещё нет. В PowerShell:
+## Пользовательский сценарий
 
-   ```powershell
-   if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-   ```
+1. Клиент выбирает активного специалиста.
+2. Frontend загружает услуги, доступные у этого специалиста.
+3. После выбора даты API строит свободные слоты по графику и исключает пересечения.
+4. Клиент указывает контакт и при желании описывает запрос.
+5. Backend повторно валидирует запись, сохраняет её со статусом `pending` и возвращает подтверждение.
 
-2. Укажите `BOT_TOKEN` в `.env`. Токен передаётся только контейнеру бота,
-   в образы и переменные фронтенда он не включается. Запускайте один экземпляр
-   polling-бота с этим токеном: остановите ранее запущенный вручную экземпляр.
+Тот же backend обслуживает Telegram-бота: бот регистрирует пользователя по Telegram ID, показывает услуги, даты и свободное время, затем создаёт запись через API.
 
-3. Соберите и запустите сервисы:
+## Стек
 
-   ```sh
-   docker compose up --build -d
-   docker compose ps -a
-   docker compose logs --tail=50 bot
-   ```
+| Область | Технологии |
+|---|---|
+| Frontend | Vue 3, TypeScript, Vite, Tailwind CSS 4, responsive CSS |
+| Backend | Python 3.12, FastAPI, Pydantic 2, Uvicorn |
+| Данные | SQLAlchemy 2 Async ORM, SQLite, repository pattern |
+| Telegram | aiogram 3, HTTPX |
+| Тестирование | `unittest`, FastAPI TestClient, Node Test Runner, Playwright |
+| Инфраструктура | Docker, Docker Compose, healthchecks, volumes |
 
-   Проверить фронтенд и API без токена можно отдельно:
+## Архитектура
 
-   ```sh
-   docker compose up --build -d --wait backend frontend
-   ```
+```mermaid
+flowchart LR
+    U[Пользователь] -->|браузер| FE[Vue 3 + TypeScript]
+    U -->|Telegram| BOT[aiogram bot]
+    FE -->|REST / JSON| API[FastAPI]
+    BOT -->|REST / JSON| API
+    API --> S[Service layer]
+    S --> R[Repository layer]
+    R --> DB[(SQLite)]
+```
 
-   Без `BOT_TOKEN` контейнер бота завершится с сообщением `BOT_TOKEN is not set`.
-   После заполнения `.env` выполните `docker compose up -d bot`:
-   обычный `restart` не применяет новые переменные окружения.
+Frontend и бот не работают с базой напрямую. Вся бизнес-логика записи сосредоточена в backend: HTTP-слой принимает запрос, service-слой проверяет правила, repository-слой выполняет запросы к базе.
 
-4. Для демонстрационной формы заполните новую базу тестовыми данными:
+Основные сущности:
 
-   ```sh
-   docker compose exec backend python -m app.seed
-   ```
+- `User` — клиент, связанный с Telegram-аккаунтом;
+- `Specialist` — специалист, его профиль и статус активности;
+- `Service` — услуга, длительность, стоимость и валюта;
+- `WorkingSchedule` — интервалы работы по дням недели;
+- `Appointment` — запись, контакт клиента и её статус.
 
-   Seed запускается вручную; при обычном старте таблицы создаются автоматически,
-   но демонстрационные записи не добавляются. Форма пока использует тестового
-   пользователя `id = 1`, который появляется при заполнении новой базы.
+## Быстрый запуск через Docker
 
-Адреса:
+Понадобится только Docker Desktop с Linux containers и Docker Compose. Python и Node.js локально устанавливать не нужно.
 
-- Фронтенд: <http://127.0.0.1:5173>.
-- Документация API: <http://127.0.0.1:8000/docs>.
-- Проверка API и подключения к БД: <http://127.0.0.1:8000/health>.
+```powershell
+# 1. Создать файл окружения
+Copy-Item .env.example .env
 
-Используйте именно `127.0.0.1`: этот origin разрешён текущими настройками CORS.
-Оба опубликованных порта доступны только с локального компьютера. Бот получает
-обновления через исходящие запросы к Telegram и не требует опубликованного порта.
+# 2. Собрать и запустить web-приложение
+docker compose up --build -d --wait backend frontend
 
-### Как устроен запуск
+# 3. Добавить демонстрационного пользователя, специалиста,
+#    услугу и расписание Пн–Пт, 09:00–18:00
+docker compose exec backend python -m app.seed
+```
 
-- `backend` собирает образ `appointment-booking-python:dev` и запускает FastAPI
-  через Uvicorn с перезагрузкой при изменении Python-кода.
-- `bot` использует этот же образ и обращается к `http://backend:8000`.
-  Сборка Python-образа описана у `backend`; команда `up --build` собирает его
-  перед запуском зависимого бота.
-- `frontend` запускает Vite в Node.js-контейнере. Запросы из браузера идут на
-  `http://127.0.0.1:8000`, поэтому внутреннее имя `backend` фронтенду не передаётся.
-- Бот и фронтенд стартуют после успешного healthcheck API. `/health` проверяет
-  подключение к БД и возвращает HTTP 503 при ошибке базы.
-- Исходники подключены с компьютера. Для Vite и Uvicorn включён polling файлов,
-  чтобы изменения из Windows обнаруживались в Linux-контейнерах Docker Desktop.
-- Python-контейнеры видят только папку `app`; локальная корневая `.env` туда
-  не монтируется. Linux-зависимости фронтенда хранятся в отдельном volume
-  `frontend_node_modules`, независимо от Windows-папки `frontend/node_modules`.
+После запуска доступны:
 
-### Данные и настройки
+- web-интерфейс — <http://127.0.0.1:5173>;
+- Swagger UI — <http://127.0.0.1:8000/docs>;
+- healthcheck — <http://127.0.0.1:8000/health>.
 
-SQLite находится в `/data/database.db` бэкенда, в именованном volume `sqlite_data`.
-Обычные перезапуски, пересборка образа и `docker compose down` сохраняют базу.
-`docker compose down -v` удаляет volumes, включая базу данных.
+Чтобы подключить Telegram-бота, укажите токен в `.env`:
 
-Compose начинает с отдельной пустой базы и не переносит существующий локальный
-`database.db`. Если нужен перенос данных, сначала сделайте резервную копию
-исходной базы; seed не заменяет перенос.
+```dotenv
+BOT_TOKEN=your_telegram_bot_token
+```
 
-В Compose адрес БД фиксирован на путь внутри volume. `DATABASE_URL` и
-`API_BASE_URL` из `.env.example` предназначены для запуска Python без Docker.
-Пустой `DATABASE_URL` при таком запуске использует прежний путь `./database.db`.
-Настройки адреса API фронтенда в Compose также имеют приоритет над `.env` Vite.
+Затем запустите бота:
 
-### Повседневные команды
-
-```sh
-# Логи всех сервисов / только бота
-docker compose logs -f
+```powershell
+docker compose up -d bot
 docker compose logs -f bot
+```
 
-# Перезапуск бота после изменения его кода
-docker compose restart bot
+> Для одного токена должен работать только один polling-экземпляр бота. Секрет передаётся только контейнеру `bot` и не попадает во frontend.
 
-# Применить изменения Python-зависимостей и пересоздать оба Python-контейнера
-docker compose up --build -d --force-recreate backend bot
+Остановить проект, сохранив базу данных:
 
-# Остановить систему, сохранив данные
+```powershell
 docker compose down
 ```
 
-После изменения `frontend/package.json` или lock-файла обновите зависимости
-в Linux-volume и пересоберите образ:
+Данные SQLite хранятся в Docker volume `sqlite_data`. Команда `docker compose down -v` удалит volume вместе с демонстрационной базой.
 
-```sh
-docker compose stop frontend
-docker compose run --rm --no-deps frontend npm ci --no-audit --no-fund
-docker compose up --build -d frontend
-```
+## Конфигурация
 
-Проверки фронтенда внутри контейнера:
+| Переменная | Где используется | Значение по умолчанию / назначение |
+|---|---|---|
+| `BOT_TOKEN` | Telegram-бот | токен от BotFather; обязателен только для бота |
+| `DATABASE_URL` | backend вне Docker | `sqlite+aiosqlite:///./database.db` |
+| `API_BASE_URL` | бот вне Docker | `http://127.0.0.1:8000` |
+| `VITE_API_BASE_URL` | frontend вне Docker | `http://127.0.0.1:8000` |
 
-```sh
-docker compose exec frontend npm run lint
-docker compose exec frontend npm run build
-```
+В Docker Compose адреса сервисов уже настроены. Порты `5173` и `8000` опубликованы только на `127.0.0.1`.
 
-Это конфигурация разработки с Vite и Uvicorn `--reload`. Для публичного сервера
-нужны отдельная конфигурация запуска, собранный фронтенд и HTTPS.
+## REST API
 
-### Проверки настроек API
+| Метод | Endpoint | Назначение |
+|---|---|---|
+| `GET` | `/health` | проверить API и соединение с БД |
+| `GET` | `/specialists` | получить активных специалистов |
+| `GET` | `/services` | получить активные услуги |
+| `GET` | `/services/specialist/{id}` | получить услуги специалиста |
+| `GET` | `/appointments/available-slots` | рассчитать свободные слоты |
+| `GET` | `/appointments/{id}` | получить запись по ID |
+| `POST` | `/appointments` | создать запись |
+| `POST` | `/users/telegram` | получить или создать Telegram-пользователя |
 
-При установленном Python с зависимостями проекта:
+Полные схемы запросов, ответов и интерактивные примеры доступны в Swagger UI после запуска backend.
 
-```sh
+## Тестирование
+
+Backend-тесты используют временную SQLite-базу, не затрагивают рабочие данные и не обращаются к Telegram:
+
+```powershell
 python -m unittest discover -s tests -v
 ```
 
-Тесты используют временные базы: проверяют `DATABASE_URL`, создание таблиц,
-успешный healthcheck и HTTP 503 при недоступности БД. В Telegram не обращаются.
+Проверяются загрузка конфигурации, создание схемы БД, успешный healthcheck и ответ `503` при недоступной базе.
+
+Проверки frontend:
+
+```powershell
+cd frontend
+npm ci
+npm run lint
+npm run build
+```
+
+Браузерные тесты запускаются при работающем frontend и проверяют основной booking flow, валидацию, повторные запросы, обработку конфликтов и адаптивность:
+
+```powershell
+npm run test:ui
+```
+
+## Структура проекта
+
+```text
+.
+├── app/
+│   ├── api/                 # роутеры, DTO-схемы, зависимости, error handling
+│   ├── database/            # SQLAlchemy engine, модели и связи
+│   ├── repositories/        # доступ к данным
+│   ├── services/            # бизнес-правила записи и расписания
+│   ├── telegram_bot/        # aiogram handlers и API-клиент
+│   ├── main.py              # FastAPI application
+│   └── seed.py              # идемпотентные демоданные
+├── frontend/
+│   ├── src/entities/        # типы предметной области
+│   ├── src/shared/          # API-клиент и общая booking-логика
+│   ├── src/App.vue          # основной пользовательский сценарий
+│   └── tests/               # Playwright UI-тесты
+├── tests/                   # runtime-тесты backend
+├── compose.yaml             # локальная fullstack-среда
+├── Dockerfile               # единый Python-образ для API и бота
+└── requirements.txt
+```
+
+## Что можно развить дальше
+
+- авторизация и личные кабинеты клиента и специалиста;
+- управление расписанием и статусами записей через административный интерфейс;
+- уведомления и перенос/отмена консультации;
+- миграции Alembic и PostgreSQL для production-окружения;
+- транзакционная защита от одновременного бронирования одного слота;
+- CI/CD, production-сборка frontend, HTTPS и мониторинг.
+
